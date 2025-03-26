@@ -1,6 +1,9 @@
 from burp import IBurpExtender, IExtensionStateListener, IHttpListener
 from burp import IScanIssue
 from burp import IScannerCheck
+from helper import automateRequests
+from CustomScanIssue import CustomScanIssue
+from Constants import *
 
 
 class BurpExtender(IBurpExtender, IScannerCheck):
@@ -18,54 +21,12 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 
     def doActiveScan(self, baseRequestResponse, insertionPoint):
         try:
-            self._requests = self.automateRequests("payloads.txt")
+            self._requests = automateRequests("payloads.txt")
             url =""
             self.sendAPIRequests(url)
         except Exception as ex:
             print(ex)
-
-
-    def automateRequests(self, file):
-        requests = []
-        try:
-            with open(file, 'r') as src:
-                lines = src.readlines()
-                method = None
-                contentType = None
-                payload = None
-                endpoint = None
-
-                for line in lines:
-                    line = line.strip()
-                    
-                    if line.startswith("POST") or line.startswith("GET"):
-                        parts = line.split(" ")
-                        method = parts[0]
-                        endpoint = parts[1]
-
-                    elif line.startswith("json") or line.startswith("xml") or line.startswith("text"):
-                        content = line.split(" - ")
-                        payload = content[1]
-                        if content[0].lower() == "json":
-                            contentType = "application/json"
-                        elif content[0].lower() == "xml":
-                            contentType = "application/xml"
-                        elif content[0].lower() == "text":
-                            contentType = "text/plain"
-                        
-                    elif line.startswith("-----"):
-                        requests.append(
-                            (method, endpoint, payload, contentType)
-                        )
-
-                        method = None
-                        endpoint = None
-                        payload = None
-                        contentType = None
-        except Exception as e:
-            print("file not loaded properly")
-        
-        return requests
+   
     
 
     def sendAPIRequests(self, url):
@@ -108,14 +69,14 @@ class BurpExtender(IBurpExtender, IScannerCheck):
                         encodings.append(encoding)
 
             if len(set(contentTypes)) > 1 and len(set(encodings)) > 2:
-                issues.append(CustomScanIssue(baseRequestResponse, "API Request Content-Type Inconsistency",
-                                          "The response Content-Type and ecncoidng is inconsistent.", "Low"))
+                issues.append(CustomScanIssue(baseRequestResponse,INCONSISTENT_CONTENT_ISSUE,
+                                          INCONSISTENT_CONTENT_ENCODING_TYPE, INCONSISTENT_CONTENT_REMEDIATION, LOW, CERTAIN))
             elif len(set(contentTypes)) > 1:
-                issues.append(CustomScanIssue(baseRequestResponse, "API Request Content-Type Inconsistency",
-                                          "The response Content-Type is inconsistent.", "Low"))
+                issues.append(CustomScanIssue(baseRequestResponse, INCONSISTENT_CONTENT_ISSUE,
+                                         INCONSISTENT_CONTENT_TYPE, INCONSISTENT_CONTENT_REMEDIATION, LOW, CERTAIN))
             elif len(set(encodings)) > 2:
-                issues.append(CustomScanIssue(baseRequestResponse, "API Request Content-Type Inconsistency",
-                                          "The response ecncoding is inconsistent.", "Low"))
+                issues.append(CustomScanIssue(baseRequestResponse, INCONSISTENT_CONTENT_ISSUE,
+                                          INCONSISTENT_CONTENT_ENCODING, INCONSISTENT_CONTENT_REMEDIATION, LOW, CERTAIN))
 
             return issues
         
@@ -131,45 +92,7 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 
 
 
-class CustomScanIssue(IScanIssue):
-    def __init__(self, requestResponse, issueName, issueDetail, severity):
-        self._requestResponse = requestResponse
-        self._issueName = issueName
-        self._issueDetail = issueDetail
-        self._severity = severity
 
-    def getUrl(self):
-        return self._requestResponse.getUrl()
-
-    def getIssueName(self):
-        return self._issueName
-
-    def getIssueType(self):
-        return 0
-
-    def getSeverity(self):
-        return self._severity
-
-    def getConfidence(self):
-        return "Certain"
-
-    def getIssueBackground(self):
-        return None
-
-    def getRemediationBackground(self):
-        return None
-
-    def getIssueDetail(self):
-        return self._issueDetail
-
-    def getRemediationDetail(self):
-        return "Inconsistencies in encoidng and parsing in the application components!"
-
-    def getHttpMessages(self):
-        return [self._requestResponse]
-
-    def getHttpService(self):
-        return self._requestResponse.getHttpService()
 
 
 
