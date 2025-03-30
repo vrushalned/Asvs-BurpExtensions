@@ -14,6 +14,7 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
         return None
     
     def doPassiveScan(self, baseRequestResponse):
+        self._callbacks.issueAlert("PassiveScan undergoing!")
         issues=[]
        
         issues = self.analyzeCookies(baseRequestResponse)
@@ -28,16 +29,19 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
     def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
         issues = []
         if messageIsRequest is True:
+            self._callbacks.issueAlert("Request analysis undergoing!")
             request = self._helpers.analyzeRequest(messageInfo)
             requestHeaders = request.getHeaders()
             issues = self.checkCookies(requestHeaders, messageIsRequest, messageInfo)
 
         else:
+            self._callbacks.issueAlert("Response analysis undergoing!")
             response = self._helpers.analyzeResponse(messageInfo)
             responseHeaders = response.getHeaders()
             issues = self.checkCookies(responseHeaders, messageIsRequest, messageInfo)
         
         for issue in issues:
+            self._callbacks.issueAlert(f"Issue found: {issue}")
             self._callbacks.addScanIssue(issue)
 
 
@@ -63,6 +67,7 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
 
     def checkCookies(self,headers, isRequest, baseRequestResponse):
         issues = []
+        self._callbacks.issueAlert("Checking Cookies!")
         for header in headers:
             _hasHostPrefix = False
             _isSecure = False
