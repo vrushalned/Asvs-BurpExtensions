@@ -14,9 +14,8 @@ class BurpExtender(IBurpExtender, IScannerCheck):
     
     def doPassiveScan(self, baseRequestResponse):
         issues=[]
-        response = self._helpers.analyzeResponse(baseRequestResponse.getResponse())
        
-        issues = self.analyzeCookies(response)
+        issues = self.analyzeCookies(baseRequestResponse)
 
         
 
