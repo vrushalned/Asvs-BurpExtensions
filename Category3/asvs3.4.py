@@ -1,4 +1,5 @@
 from burp import IBurpExtender, IScannerCheck, IScanIssue, IHttpListener
+import re
 
 class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
 
@@ -29,23 +30,32 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
     def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
         try:
             issues = []
-            if messageIsRequest is True:
+            requestType = "request" if messageIsRequest else "response"
+            messagType = "request type is: " + requestType
+            self._callbacks.issueAlert(messagType)
+            if messageIsRequest:
                 self._callbacks.issueAlert("Request analysis undergoing!")
-                request = self._helpers.analyzeRequest(messageInfo.getResponse())
+                request = self._helpers.analyzeRequest(messageInfo.getRequest())
                 requestHeaders = request.getHeaders()
-                self._callbacks.issueAlert("Going into checkCookies!")
-                issues = self.checkCookies(requestHeaders, messageIsRequest, messageInfo)
+                self._callbacks.issueAlert("Request Going into checkCookies!")
+                issues.extend(self.checkCookies(requestHeaders, messageIsRequest, messageInfo))
 
             else:
                 self._callbacks.issueAlert("Response analysis undergoing!")
                 #self._callbacks.issueAlert(str(messageIsRequest))
                 response = self._helpers.analyzeResponse(messageInfo.getResponse())
                 responseHeaders = response.getHeaders()
-                self._callbacks.issueAlert("Going into checkCookies!")
-                issues = self.checkCookies(responseHeaders, messageIsRequest, messageInfo)
+                self._callbacks.issueAlert("Response Going into checkCookies!")
+                issues.extend(self.checkCookies(responseHeaders, messageIsRequest, messageInfo))
+
+                jsIssues = self.analyzeJavascriptCookies(response, messageInfo)
+                jsIssuesLength = "lenth of js issues: " + str(len(jsIssues))
+                self._callbacks.issueAlert(jsIssuesLength)
+                issues.extend(jsIssues)
                 
 
             self._callbacks.issueAlert(str(len(issues)))
+            
 
             for issue in issues:
                 self._callbacks.issueAlert("Issue found: ")
@@ -64,7 +74,34 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
         issues = self.checkCookies(headers, False, baseRequestResponse)
 
         return issues
-        
+
+
+    def analyzeJavascriptCookies(self, response,messageInfo):
+        try:
+            self._callbacks.issueAlert("analyzing js cookies")
+            issues = []
+            body_offset = response.getBodyOffset()
+            rawResponse = bytes(messageInfo.getResponse())
+            responseBody = rawResponse[body_offset:].decode("utf-8", errors="ignore") 
+
+            jsExpression = re.compile(r'document\.cookie\s*=\s*[\'"`]([^;]+?=.*?)[\'"`]', re.IGNORECASE)
+
+            cookieMatches = jsExpression.findall(responseBody)
+            
+            for cookie in cookieMatches:
+                setCookie = "set-cookie: " + cookie
+                headers = [setCookie]
+                jsIssue = self.checkCookies(headers, False, messageInfo)
+                if jsIssue:
+                    issues.extend(jsIssue)
+
+            return issues
+        except Exception as ex:
+            self._callbacks.issueAlert(str(ex))
+            self._callbacks.issueAlert("js error")
+            return []
+
+
 
                     
 
