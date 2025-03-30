@@ -27,23 +27,32 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
         return -1
     
     def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
-        issues = []
-        if messageIsRequest is True:
-            self._callbacks.issueAlert("Request analysis undergoing!")
-            request = self._helpers.analyzeRequest(messageInfo)
-            requestHeaders = request.getHeaders()
-            issues = self.checkCookies(requestHeaders, messageIsRequest, messageInfo)
+        try:
+            issues = []
+            if messageIsRequest is True:
+                self._callbacks.issueAlert("Request analysis undergoing!")
+                request = self._helpers.analyzeRequest(messageInfo)
+                requestHeaders = request.getHeaders()
+                self._callbacks.issueAlert("Going into checkCookies!")
+                issues = self.checkCookies(requestHeaders, messageIsRequest, messageInfo)
 
-        else:
-            self._callbacks.issueAlert("Response analysis undergoing!")
-            response = self._helpers.analyzeResponse(messageInfo)
-            responseHeaders = response.getHeaders()
-            issues = self.checkCookies(responseHeaders, messageIsRequest, messageInfo)
-        
-        for issue in issues:
-            self._callbacks.issueAlert("Issue found: ")
-            self._callbacks.issueAletr(issue)
-            self._callbacks.addScanIssue(issue)
+            else:
+                self._callbacks.issueAlert("Response analysis undergoing!")
+                #self._callbacks.issueAlert(str(messageIsRequest))
+                response = self._helpers.analyzeResponse(messageInfo)
+                responseHeaders = response.getHeaders()
+                self._callbacks.issueAlert("Going into checkCookies!")
+                issues = self.checkCookies(responseHeaders, messageIsRequest, messageInfo)
+                
+
+            self._callbacks.issueAlert(len(issues))
+
+            for issue in issues:
+                self._callbacks.issueAlert("Issue found: ")
+                self._callbacks.issueAlert(issue.getIssueName())
+                self._callbacks.addScanIssue(issue)
+        except Exception as ex:
+            self._callbacks.issueAlert(ex)
 
 
     
@@ -67,55 +76,58 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
     
 
     def checkCookies(self,headers, isRequest, baseRequestResponse):
-        issues = []
-        self._callbacks.issueAlert("Checking Cookies!")
-        for header in headers:
-            _hasHostPrefix = False
-            _isSecure = False
-            _isHttpOnly = False
-            _hasSafePath = False
-            _hasSameSiteProtection = False
-            cookieKey = "cookie" if isRequest else "set-cookie"
-            if header.strip().lower().startswith(cookieKey):
-                cookie = header.split(":")[1]
-                attributes = cookie.split(";")
-                for  attribute in attributes:
-                    if attribute.lower().startswith("_host"):
-                        _hasHostPrefix = True
-                    if attribute.lower().startswith("secure"):
-                        _isSecure = True
-                    if attribute.lower().startswith("httponly"):
-                        _isHttpOnly = True
-                    if attribute.lower().startswith("path"):
-                        path = attribute.split("=")[1]
-                        if path != "/":
-                            _hasSafePath = True
-                    if attribute.lower().startswith("samesite"):
-                        sameSite = attribute.split("=")[1]
-                        if sameSite.lower() != "none":
-                            _hasSameSiteProtection = True
+        try:
+            issues = []
+            self._callbacks.issueAlert("Inside checkCookies!")
+            self._callbacks.issueAlert("Checking Cookies!")
+            for header in headers:
+                _hasHostPrefix = False
+                _isSecure = False
+                _isHttpOnly = False
+                _hasSafePath = False
+                _hasSameSiteProtection = False
+                cookieKey = "cookie" if isRequest else "set-cookie"
+                if header.strip().lower().startswith(cookieKey):
+                    cookie = header.split(":")[1]
+                    attributes = cookie.split(";")
+                    for  attribute in attributes:
+                        if attribute.lower().startswith("_host"):
+                            _hasHostPrefix = True
+                        if attribute.lower().startswith("secure"):
+                            _isSecure = True
+                        if attribute.lower().startswith("httponly"):
+                            _isHttpOnly = True
+                        if attribute.lower().startswith("path"):
+                            path = attribute.split("=")[1]
+                            if path != "/":
+                                _hasSafePath = True
+                        if attribute.lower().startswith("samesite"):
+                            sameSite = attribute.split("=")[1]
+                            if sameSite.lower() != "none":
+                                _hasSameSiteProtection = True
 
-                if _hasHostPrefix is False:
-                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie Host prefix",   
-                                                    "_Host- prefix is missing", "_Host- prefix must be added so cookies are only sent to the host that initially set the cookie.", "Low", "Certain" ))
-                     
-                if _hasSafePath is False:
-                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie Path",   
-                                                    "Path set to /", "Cookie path must be set to the mist precise path", "Low", "Certain" ))
-                     
-                if _hasSameSiteProtection is False:
-                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie SameSite",   
-                                                    "SameSite set to None", "Cookie SameSite must be set to value that limit exposure to cross-site scripting", "Low", "Certain" ))
-                if _isSecure is False:
-                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie Secure",   
-                                                    "Secure attribute not set in cookie", "Cookie must contain the secure attribute enabled", "Low", "Certain" ))
-                     
-                if _isHttpOnly is False:
-                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie HttpOnly",   
-                                                    "HttpOnly attribute not set in cookie", "Cookie must contain the HttpOnly attribute enabled", "Low", "Certain" )) 
+                    if _hasHostPrefix is False:
+                        issues.append(CustomScanIssue(baseRequestResponse,"Cookie Host prefix",   
+                                                        "_Host- prefix is missing", "_Host- prefix must be added so cookies are only sent to the host that initially set the cookie.", "Low", "Certain" ))
+                        
+                    if _hasSafePath is False:
+                        issues.append(CustomScanIssue(baseRequestResponse,"Cookie Path",   
+                                                        "Path set to /", "Cookie path must be set to the mist precise path", "Low", "Certain" ))
+                        
+                    if _hasSameSiteProtection is False:
+                        issues.append(CustomScanIssue(baseRequestResponse,"Cookie SameSite",   
+                                                        "SameSite set to None", "Cookie SameSite must be set to value that limit exposure to cross-site scripting", "Low", "Certain" ))
+                    if _isSecure is False:
+                        issues.append(CustomScanIssue(baseRequestResponse,"Cookie Secure",   
+                                                        "Secure attribute not set in cookie", "Cookie must contain the secure attribute enabled", "Low", "Certain" ))
+                        
+                    if _isHttpOnly is False:
+                        issues.append(CustomScanIssue(baseRequestResponse,"Cookie HttpOnly",   
+                                                        "HttpOnly attribute not set in cookie", "Cookie must contain the HttpOnly attribute enabled", "Low", "Certain" )) 
 
-        return issues                    
-
+            return issues                    
+        except Exception as ex:
+            self._callbacks.issueAlert(ex)
 
 class CustomScanIssue(IScanIssue):
     def __init__(self, requestResponse, issueName, issueDetail, issueRemediation, severity, confidence):
