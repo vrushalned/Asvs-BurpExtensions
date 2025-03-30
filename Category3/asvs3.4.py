@@ -31,7 +31,7 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
             issues = []
             if messageIsRequest is True:
                 self._callbacks.issueAlert("Request analysis undergoing!")
-                request = self._helpers.analyzeRequest(messageInfo)
+                request = self._helpers.analyzeRequest(messageInfo.getResponse())
                 requestHeaders = request.getHeaders()
                 self._callbacks.issueAlert("Going into checkCookies!")
                 issues = self.checkCookies(requestHeaders, messageIsRequest, messageInfo)
@@ -39,13 +39,13 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
             else:
                 self._callbacks.issueAlert("Response analysis undergoing!")
                 #self._callbacks.issueAlert(str(messageIsRequest))
-                response = self._helpers.analyzeResponse(messageInfo)
+                response = self._helpers.analyzeResponse(messageInfo.getResponse())
                 responseHeaders = response.getHeaders()
                 self._callbacks.issueAlert("Going into checkCookies!")
                 issues = self.checkCookies(responseHeaders, messageIsRequest, messageInfo)
                 
 
-            self._callbacks.issueAlert(len(issues))
+            self._callbacks.issueAlert(str(len(issues)))
 
             for issue in issues:
                 self._callbacks.issueAlert("Issue found: ")
@@ -59,7 +59,7 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
     def analyzeCookies(self, baseRequestResponse):
         issues = []
         
-        headers = self._helpers.analyzeResponse(baseRequestResponse).getHeaders()
+        headers = self._helpers.analyzeResponse(baseRequestResponse.getResponse()).getHeaders()
 
         issues = self.checkCookies(headers, False, baseRequestResponse)
 
