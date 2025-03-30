@@ -1,6 +1,6 @@
-from burp import IBurpExtender, IScannerCheck, IScanIssue
+from burp import IBurpExtender, IScannerCheck, IScanIssue, IHttpListener
 
-class BurpExtender(IBurpExtender, IScannerCheck):
+class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
 
     def registerExtenderCallbacks(self, callbacks):
         self._callbacks = callbacks
@@ -8,6 +8,7 @@ class BurpExtender(IBurpExtender, IScannerCheck):
         
         callbacks.setExtensionName("CookieAnalyzer")
         callbacks.registerScannerCheck(self)
+        callbacks.registerHttpListener(self)
 
     def doActiveScan(self, baseRequestResponse, insertionPoint):
         return None
@@ -24,17 +25,52 @@ class BurpExtender(IBurpExtender, IScannerCheck):
     def consolidateDuplicateIssues(self, existingIssue, newIssue):
         return -1
     
+    def processHttpMessage(self, toolFlag, messageIsRequest, messageInfo):
+        issues = []
+        if messageIsRequest is True:
+            request = self._helpers.analyzeRequest(messageInfo)
+            requestHeaders = request.getHeaders()
+            issues = self.checkCookies(requestHeaders, messageIsRequest, messageInfo)
+
+        else:
+            response = self._helpers.analyzeResponse(messageInfo)
+            responseHeaders = response.getHeaders()
+            issues = self.checkCookies(responseHeaders, messageIsRequest, messageInfo)
+        
+        for issue in issues:
+            self._callbacks.addScanIssue(issue)
+
+
+    
     def analyzeCookies(self, baseRequestResponse):
         issues = []
         
         headers = self._helpers.analyzeResponse(baseRequestResponse).getHeaders()
+
+        issues = self.checkCookies(headers, False, baseRequestResponse)
+
+        return issues
+        
+
+                    
+
+
+
+           
+            #issues.append(CustomScanIssue(baseRequestResponse,"Cookie",   
+            #                                        cookieName, cookieValue, "Low", "Certain" ))
+    
+
+    def checkCookies(self,headers, isRequest, baseRequestResponse):
+        issues = []
         for header in headers:
             _hasHostPrefix = False
             _isSecure = False
             _isHttpOnly = False
             _hasSafePath = False
             _hasSameSiteProtection = False
-            if header.lower().startswith("set-cookie"):
+            cookieKey = "cookie" if isRequest else "set-cookie"
+            if header.strip().lower().startswith(cookieKey):
                 cookie = header.split(":")[1]
                 attributes = cookie.split(";")
                 for  attribute in attributes:
@@ -71,17 +107,6 @@ class BurpExtender(IBurpExtender, IScannerCheck):
                 if _isHttpOnly is False:
                      issues.append(CustomScanIssue(baseRequestResponse,"Cookie HttpOnly",   
                                                     "HttpOnly attribute not set in cookie", "Cookie must contain the HttpOnly attribute enabled", "Low", "Certain" ))                     
-
-
-                    
-
-
-
-           
-            #issues.append(CustomScanIssue(baseRequestResponse,"Cookie",   
-            #                                        cookieName, cookieValue, "Low", "Certain" ))
-    
-
 
 
 class CustomScanIssue(IScanIssue):
