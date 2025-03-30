@@ -52,7 +52,7 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
                 self._callbacks.issueAlert(issue.getIssueName())
                 self._callbacks.addScanIssue(issue)
         except Exception as ex:
-            self._callbacks.issueAlert(ex)
+            self._callbacks.issueAlert(str(ex))
 
 
     
@@ -127,7 +127,7 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
 
             return issues                    
         except Exception as ex:
-            self._callbacks.issueAlert(ex)
+            self._callbacks.issueAlert(str(ex))
 
 class CustomScanIssue(IScanIssue):
     def __init__(self, requestResponse, issueName, issueDetail, issueRemediation, severity, confidence):
