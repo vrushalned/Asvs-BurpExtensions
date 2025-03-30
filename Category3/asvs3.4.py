@@ -106,7 +106,9 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
                      
                 if _isHttpOnly is False:
                      issues.append(CustomScanIssue(baseRequestResponse,"Cookie HttpOnly",   
-                                                    "HttpOnly attribute not set in cookie", "Cookie must contain the HttpOnly attribute enabled", "Low", "Certain" ))                     
+                                                    "HttpOnly attribute not set in cookie", "Cookie must contain the HttpOnly attribute enabled", "Low", "Certain" )) 
+
+        return issues                    
 
 
 class CustomScanIssue(IScanIssue):
