@@ -1,0 +1,128 @@
+from burp import IBurpExtender, IScannerCheck, IScanIssue
+
+class BurpExtender(IBurpExtender, IScannerCheck):
+
+    def registerExtenderCallbacks(self, callbacks):
+        self._callbacks = callbacks
+        self._helpers = callbacks.getHelpers()
+        
+        callbacks.setExtensionName("CookieAnalyzer")
+        callbacks.registerScannerCheck(self)
+
+    def doActiveScan(self, baseRequestResponse, insertionPoint):
+        return None
+    
+    def doPassiveScan(self, baseRequestResponse):
+        issues=[]
+        response = self._helpers.analyzeResponse(baseRequestResponse.getResponse())
+       
+        issues = self.analyzeCookies(response)
+
+        
+
+        return issues 
+    
+    def consolidateDuplicateIssues(self, existingIssue, newIssue):
+        return -1
+    
+    def analyzeCookies(self, baseRequestResponse):
+        issues = []
+        
+        headers = self._helpers.analyzeResponse(baseRequestResponse).getHeaders()
+        for header in headers:
+            _hasHostPrefix = False
+            _isSecure = False
+            _isHttpOnly = False
+            _hasSafePath = False
+            _hasSameSiteProtection = False
+            if header.lower().startswith("set-cookie"):
+                cookie = header.split(":")[1]
+                attributes = cookie.split(";")
+                for  attribute in attributes:
+                    if attribute.lower().startswith("_host"):
+                        _hasHostPrefix = True
+                    if attribute.lower().startswith("secure"):
+                        _isSecure = True
+                    if attribute.lower().startswith("httponly"):
+                        _isHttpOnly = True
+                    if attribute.lower().startswith("path"):
+                        path = attribute.split("=")[1]
+                        if path != "/":
+                            _hasSafePath = True
+                    if attribute.lower().startswith("samesite"):
+                        sameSite = attribute.split("=")[1]
+                        if sameSite.lower() != "none":
+                            _hasSameSiteProtection = True
+
+                if _hasHostPrefix is False:
+                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie Host prefix",   
+                                                    "_Host- prefix is missing", "_Host- prefix must be added so cookies are only sent to the host that initially set the cookie.", "Low", "Certain" ))
+                     
+                if _hasSafePath is False:
+                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie Path",   
+                                                    "Path set to /", "Cookie path must be set to the mist precise path", "Low", "Certain" ))
+                     
+                if _hasSameSiteProtection is False:
+                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie SameSite",   
+                                                    "SameSite set to None", "Cookie SameSite must be set to value that limit exposure to cross-site scripting", "Low", "Certain" ))
+                if _isSecure is False:
+                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie Secure",   
+                                                    "Secure attribute not set in cookie", "Cookie must contain the secure attribute enabled", "Low", "Certain" ))
+                     
+                if _isHttpOnly is False:
+                     issues.append(CustomScanIssue(baseRequestResponse,"Cookie HttpOnly",   
+                                                    "HttpOnly attribute not set in cookie", "Cookie must contain the HttpOnly attribute enabled", "Low", "Certain" ))                     
+
+
+                    
+
+
+
+           
+            #issues.append(CustomScanIssue(baseRequestResponse,"Cookie",   
+            #                                        cookieName, cookieValue, "Low", "Certain" ))
+    
+
+
+
+class CustomScanIssue(IScanIssue):
+    def __init__(self, requestResponse, issueName, issueDetail, issueRemediation, severity, confidence):
+        self._requestResponse = requestResponse
+        self._issueName = issueName
+        self._issueDetail = issueDetail
+        self._severity = severity
+        self._issueRemediation = issueRemediation
+        self._confidence = confidence
+
+    def getUrl(self):
+        return self._requestResponse.getUrl()
+
+    def getIssueName(self):
+        return self._issueName
+
+    def getIssueType(self):
+        return 0
+
+    def getSeverity(self):
+        return self._severity
+
+    def getConfidence(self):
+        return self._confidence
+
+    def getIssueBackground(self):
+        return None
+
+    def getRemediationBackground(self):
+        return None
+
+    def getIssueDetail(self):
+        return self._issueDetail
+
+    def getRemediationDetail(self):
+        return self._issueRemediation
+
+    def getHttpMessages(self):
+        return [self._requestResponse]
+
+    def getHttpService(self):
+        return self._requestResponse.getHttpService()
