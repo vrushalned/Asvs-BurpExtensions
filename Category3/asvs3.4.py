@@ -41,7 +41,8 @@ class BurpExtender(IBurpExtender, IScannerCheck, IHttpListener):
             issues = self.checkCookies(responseHeaders, messageIsRequest, messageInfo)
         
         for issue in issues:
-            self._callbacks.issueAlert(f"Issue found: {issue}")
+            self._callbacks.issueAlert("Issue found: ")
+            self._callbacks.issueAletr(issue)
             self._callbacks.addScanIssue(issue)
 
 
